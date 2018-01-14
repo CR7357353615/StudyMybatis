@@ -2,7 +2,6 @@
 ---
 ## 1.selectKey标签
 ###### 插入后返回主键
-<br>
 ```java
 public class User {  
     private int userId;  
@@ -29,7 +28,6 @@ order	| 1：BEFORE，会先选择主键，然后设置keyProperty，再执行ins
 statementType|	MyBatis 支持STATEMENT，PREPARED和CALLABLE的语句形式， 对应Statement，PreparedStatement 和CallableStatement响应|STATEMENT
 ||PREPARED
 ||CALLABLE
-<br>
 ## 2.if标签
 ### 不使用< where>标签
 ##### 如果使用以下这种形式，如果name不为空，则会拼接成一个 where AND name = '张三'这种。这样的语法是错误的，所以需要在前面加一个1=1.
@@ -43,7 +41,6 @@ where 1 = 1
 </if>  
 </select>
 ```
-<br>
 ### 使用< where>标签
 ##### 如果使用了where标签，则会自动将第一个AND，OR等去掉，不会有语法错误。
 ```xml
@@ -56,7 +53,6 @@ from user
 </if>  
 </select>
 ```
-<br>
 ## 3.if+set标签
 ##### 在< update>语句中，使用< if>可以将null值排除，使用< set>可以自动拼接set语句，并且剔除掉末尾不相关的逗号。
 ```xml
@@ -166,7 +162,6 @@ from user
     WHERE STUDENT_TBL.STUDENT_ID = #{studentId};      
 </update>  
 ```
-<br>
 ## 5.choose(when,otherwise)
 ##### when和otherwise就像java中的 if if else
 ```xml
@@ -212,7 +207,6 @@ from user
     </where>    
 </select>
 ```
-<br>
 ## 6.foreach
 ##### foreach主要用在构建in条件中，他可以在SQL语句中进行迭代一个集合。
 属性|意义
@@ -223,7 +217,6 @@ index|表示迭代的位置
 open|语句以什么开始
 separator|迭代之间以什么符号作为分隔符
 close|表示以什么结束
-<br>
 ##### collection属性有三种情况
 ##### 1.传入一个但参数，且参数类型是List，collection的值为list
 ##### 2.传入的是单参数并且类型是数组，collection的值为array
