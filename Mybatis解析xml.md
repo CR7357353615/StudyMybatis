@@ -178,6 +178,7 @@ public void parseStatementNode() {
 <br>
 ## 3.XMLLanguageDriver类
 ##### 默认使用XMLLanguageDriver的createSqlSource去生成SqlSource
+<br>
 ```java
 @Override
 public SqlSource createSqlSource(Configuration configuration, XNode script, Class<?> parameterType) {
@@ -185,7 +186,9 @@ public SqlSource createSqlSource(Configuration configuration, XNode script, Clas
   return builder.parseScriptNode();
 }
 ```
+
 ## 4.XMLScriptBuilder类
+
 ```java
 public SqlSource parseScriptNode() {
     //解析节点以及其子节点（<set><where>等等）
@@ -199,7 +202,8 @@ public SqlSource parseScriptNode() {
     }
     return sqlSource;
 }
-
+```
+```java
 List<SqlNode> parseDynamicTags(XNode node) {
     List<SqlNode> contents = new ArrayList<SqlNode>();
     //获得子节点
@@ -240,7 +244,8 @@ public boolean apply(DynamicContext context) {
   filteredDynamicContext.applyAll();
   // return result;
 }
-
+```
+```java
 public void applyAll() {
     // sqlBuffer = new StringBuilder(sqlBuffer.toString().trim());
     // String trimmedUppercaseSql = sqlBuffer.toString().toUpperCase(Locale.ENGLISH);
@@ -250,7 +255,8 @@ public void applyAll() {
     // }
     // delegate.appendSql(sqlBuffer.toString());
 }
-
+```
+```java
 private void applyPrefix(StringBuilder sql, String trimmedUppercaseSql) {
     if (!prefixApplied) {
         prefixApplied = true;
@@ -272,6 +278,8 @@ private void applyPrefix(StringBuilder sql, String trimmedUppercaseSql) {
         }
     }
 }
+```
+```java
 //后缀的处理方式相同
 private void applySuffix(StringBuilder sql, String trimmedUppercaseSql) {
     if (!suffixApplied) {
