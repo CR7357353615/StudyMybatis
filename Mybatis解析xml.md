@@ -178,7 +178,7 @@ public void parseStatementNode() {
 <br>
 ## 3.XMLLanguageDriver类
 ##### 默认使用XMLLanguageDriver的createSqlSource去生成SqlSource
-<br>
+
 ```java
 @Override
 public SqlSource createSqlSource(Configuration configuration, XNode script, Class<?> parameterType) {
