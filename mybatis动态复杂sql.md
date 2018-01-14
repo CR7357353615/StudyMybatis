@@ -24,10 +24,10 @@ useGeneratedKeys|设置是否使用JDBC的getGenereatedKeys方法获取主键并
 keyProperty |	selectKey | 对应java对象中的属性名	 
 resultType |	生成结果类型，MyBatis 允许使用基本的数据类型，包括String、int类型。|	 
 order	| 1：BEFORE，会先选择主键，然后设置keyProperty，再执行insert语句；|BEFORE
-      |2：AFTER，就先运行insert语句再运行selectKey 语句。	|AFTER
+  |2：AFTER，就先运行insert语句再运行selectKey 语句。	|AFTER
 statementType|	MyBatis 支持STATEMENT，PREPARED和CALLABLE的语句形式， 对应Statement，PreparedStatement 和CallableStatement响应|STATEMENT
-||PREPARED
-||CALLABLE
+ | |PREPARED
+ | |CALLABLE
 ## 2.if标签
 ### 不使用< where>标签
 ##### 如果使用以下这种形式，如果name不为空，则会拼接成一个 where AND name = '张三'这种。这样的语法是错误的，所以需要在前面加一个1=1.
