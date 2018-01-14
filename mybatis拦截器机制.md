@@ -1,5 +1,69 @@
 # Mybatis拦截器机制
 ---
+## 总结
+### 第一步：定义拦截器，实现Interceptor接口，xml配置文件中添加
+```java
+@Intercepts({@Signature(
+  type= Executor.class,
+  method = "update",
+  args = {MappedStatement.class,Object.class})})
+public class ExamplePlugin implements Interceptor {
+  public Object intercept(Invocation invocation) throws Throwable {
+    System.out.println("拦截");
+    return invocation.proceed();
+  }
+  public Object plugin(Object target) {
+    return Plugin.wrap(target, this);
+  }
+  public void setProperties(Properties properties) {
+  }
+}
+```
+```xml
+<plugins>
+    <plugin interceptor="org.format.mybatis.cache.interceptor.ExamplePlugin"></plugin>
+</plugins>
+```
+### 第二步 创建执行器Executor时，调用pluginAll()方法
+### 第三步 调用interceptor.plugin()方法。
+### 第四步 调用Plugin.wrap()方法。
+```java
+public static Object wrap(Object target, Interceptor interceptor) {
+    //获取需要拦截的类以及对应类需要拦截的方法
+	Map<Class<?>, Set<Method>> signatureMap = getSignatureMap(interceptor);
+    Class<?> type = target.getClass();
+    //根据目标实例target(这个target就是之前所说的MyBatis拦截器可以拦截的类，
+    //Executor,ParameterHandler,ResultSetHandler,StatementHandler)和它的父类们，
+    //返回signatureMap中含有target实现的接口数组。
+    Class<?>[] interfaces = getAllInterfaces(type, signatureMap);
+    if (interfaces.length > 0) {
+      return Proxy.newProxyInstance(
+          type.getClassLoader(),
+          interfaces,
+          new Plugin(target, interceptor, signatureMap));
+    }
+    return target;
+}
+```
+##### 如果是需要拦截的类，则返回代理类，否则返回原类
+### 第五步 如果是代理类，调用Plugin的invoke方法
+##### 如果是需要拦截的类，调用Interceptor的interceptor()方法，如果不是，执行正常方法。
+
+```java
+@Override
+public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+   try {
+     Set<Method> methods = signatureMap.get(method.getDeclaringClass());
+     if (methods != null && methods.contains(method)) {
+       return interceptor.intercept(new Invocation(target, method, args));
+     }
+     return method.invoke(target, args);
+   } catch (Exception e) {
+     throw ExceptionUtil.unwrapThrowable(e);
+   }
+}
+```
+## 下面介绍拦截机制
 ##### Mybatis提供了一种叫插件（plugin）的功能，其实就是起到了拦截器的功能，允许在已经映射的语句执行过程中的某一点进行拦截调用。以下是允许使用插件拦截的方法：
 类|方法
 --|--
