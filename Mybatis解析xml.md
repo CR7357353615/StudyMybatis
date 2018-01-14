@@ -175,7 +175,6 @@ public void parseStatementNode() {
         keyGenerator, keyProperty, keyColumn, databaseId, langDriver, resultSets);
   }
 ```
-<br>
 ## 3.XMLLanguageDriver类
 ##### 默认使用XMLLanguageDriver的createSqlSource去生成SqlSource
 
