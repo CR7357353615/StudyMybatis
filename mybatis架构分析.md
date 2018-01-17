@@ -16,6 +16,6 @@
 
 ![](imgs/Mybatis功能架构图.png)
 
-对应的源码架构图</br>
+对应的源码架构图:
 
 ![](imgs/Mybatis源码架构图.png)
