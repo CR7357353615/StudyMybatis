@@ -13,7 +13,9 @@
 言归正传，本文要总结的是Mybatis的整体架构，我这个菜鸟可总结不出来，主要是参考[http://www.cnblogs.com/mengheng/p/3739610.html](http://www.cnblogs.com/mengheng/p/3739610.html)这篇文章。但是会加一些个人的理解和总结。
 
 功能架构图：
+
 ![](imgs/Mybatis功能架构图.png)
 
-对应的源码架构图
+对应的源码架构图</br>
+
 ![](imgs/Mybatis源码架构图.png)
