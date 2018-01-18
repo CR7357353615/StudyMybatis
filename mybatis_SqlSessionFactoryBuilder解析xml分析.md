@@ -109,6 +109,7 @@ private void propertiesElement(XNode context) throws Exception {
 		}
 }
 ```
+这是解析类别名的方法
 
 ```java
 /**
@@ -145,3 +146,71 @@ private void propertiesElement(XNode context) throws Exception {
 		}
 }
 ```
+在mybatis中，为了适用于不同的环境或是数据库，需要配置环境，比如开发环境，测试环境，演示环境，生产环境等等。那么这里就需要通过配置环境< environments>标签来区分这些不同的环境。配置文件示例如下：
+```xml
+<environments default="development">
+  <environment id="development">
+    <transactionManager type="JDBC">
+      <property name="..." value="..."/>
+    </transactionManager>
+    <dataSource type="POOLED">
+      <property name="driver" value="${driver}"/>
+      <property name="url" value="${url}"/>
+      <property name="username" value="${username}"/>
+      <property name="password" value="${password}"/>
+    </dataSource>
+  </environment>
+</environments>
+```
+Mybatis不仅适用于多种环境的切换，也适用于多个数据源的切换。在mapper.xml文件中，MyBatis 会加载不带 databaseId 属性和带有匹配当前数据库 databaseId 属性的所有语句。 如果同时找到带有 databaseId 和不带 databaseId 的相同语句，则后者会被舍弃。比如一个方法，可以写两套sql，一个对应于mysql，一个对应于oracle。
+```xml
+<databaseIdProvider type="DB_VENDOR">
+      <property name="MySQL" value="mysql" />
+      <property name="Oracle" value="oracle" />
+</databaseIdProvider>
+```
+```xml
+<mapper namespace="com.elements.user.dao.dbMapper" >
+    <select id="SelectTime"   resultType="String" databaseId="mysql">
+        SELECT  NOW() FROM dual
+    </select>
+
+    <select id="SelectTime"   resultType="String" databaseId="oracle">
+        SELECT  'oralce'||to_char(sysdate,'yyyy-mm-dd hh24:mi:ss')  FROM dual
+    </select>
+</mapper>
+```
+typeHandler是建立一个数据库JDBCType和JavaType的转换关系，比如一个时间Date类型，希望存到数据库中以VARCHAR存储，我们就可以创建这样一个typeHandler类。需要重写部分方法。
+```java
+@MappedJdbcTypes(JdbcType.VARCHAR)  
+//此处如果不用注解指定jdbcType, 那么，就可以在配置文件中通过"jdbcType"属性指定， 同理， javaType 也可通过 @MappedTypes指定
+public class ExampleTypeHandler extends BaseTypeHandler<String> {
+
+  @Override
+  public void setNonNullParameter(PreparedStatement ps, int i, String parameter, JdbcType jdbcType) throws SQLException {
+    ps.setString(i, parameter);
+  }
+
+  @Override
+  public String getNullableResult(ResultSet rs, String columnName) throws SQLException {
+    return rs.getString(columnName);
+  }
+
+  @Override
+  public String getNullableResult(ResultSet rs, int columnIndex) throws SQLException {
+    return rs.getString(columnIndex);
+  }
+
+  @Override
+  public String getNullableResult(CallableStatement cs, int columnIndex) throws SQLException {
+    return cs.getString(columnIndex);
+  }
+}
+```
+```xml
+<typeHandlers>
+      <!-- 由于自定义的TypeHandler在定义时已经通过注解指定了jdbcType, 所以此处不用再配置jdbcType -->
+      <typeHandler handler="ExampleTypeHandler"/>
+</typeHandlers>
+```
+最后就是解析mappers映射器
