@@ -214,3 +214,56 @@ public class ExampleTypeHandler extends BaseTypeHandler<String> {
 </typeHandlers>
 ```
 最后就是解析mappers映射器
+```java
+private void mapperElement(XNode parent) throws Exception {
+		if (parent != null) {
+			// 遍历子节点
+			for (XNode child : parent.getChildren()) {
+				// 如果是包的形式
+				if ("package".equals(child.getName())) {
+					// 获取包名
+					String mapperPackage = child.getStringAttribute("name");
+					// 加入configu中
+					configuration.addMappers(mapperPackage);
+				} else {
+					String resource = child.getStringAttribute("resource");
+					String url = child.getStringAttribute("url");
+					String mapperClass = child.getStringAttribute("class");
+					if (resource != null && url == null && mapperClass == null) {
+						ErrorContext.instance().resource(resource);
+						InputStream inputStream = Resources.getResourceAsStream(resource);
+						XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, resource, configuration.getSqlFragments());
+						mapperParser.parse();
+					} else if (resource == null && url != null && mapperClass == null) {
+						ErrorContext.instance().resource(url);
+						InputStream inputStream = Resources.getUrlAsStream(url);
+						XMLMapperBuilder mapperParser = new XMLMapperBuilder(inputStream, configuration, url, configuration.getSqlFragments());
+						mapperParser.parse();
+					} else if (resource == null && url == null && mapperClass != null) {
+						Class<?> mapperInterface = Resources.classForName(mapperClass);
+						configuration.addMapper(mapperInterface);
+					} else {
+						throw new BuilderException("A mapper element may only specify a url, resource or class, but not more than one.");
+					}
+				}
+			}
+		}
+}
+```
+执行流程：
+mapperElement()	#加载mapper映射文件</br>
+　　->configuration.addMappers(mapperPackage)	#如果是包名，将包下的mapper全部加入</br>
+　　　　->mapperRegistry.addMappers(packageName) </br>
+　　　　　　->addMappers(packageName, Object.class) #循环包中的class</br>
+　　　　　　　　->addMapper(mapperClass) </br>
+　　　　　　　　　　->parser.parse() </br>
+　　　　　　　　　　　　->loadXmlResource() #加载xml文件</br>
+　　　　　　　　　　　　　　->xmlParser.parse() #解析mapper</br>
+　　　　　　　　　　　　->configuration.addLoadedResource(resource) #加入已加载列表中</br>
+　　　　　　　　　　　　->assistant.setCurrentNamespace(type.getName()) #设置namespace</br>
+　　　　　　　　　　　　->parseCache() #解析缓存</br>
+　　　　　　　　　　　　->parseCacheRef() #解析缓存引用</br>
+　　　　　　　　　　　　->parseStatement(method)</br>
+　　　　　　　　　　　　->parsePendingMethods() #解析待处理方法</br>
+　　->mapperParser.parse()	#当配置resource,url时调用</br>
+　　->configuration.addMapper(mapperInterface) #当配置class时调用</br>
