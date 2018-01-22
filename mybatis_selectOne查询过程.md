@@ -15,6 +15,7 @@
 ```
 这里已经获取到了SqlSessionFactory，并且生成了session，调用session的selectOne方法。本文就研究一下SelectOne方法的源码。
 
+## 源码分析
 首先，SqlSession的默认实现是DefaultSqlSession，下面是DefaultSqlSession的selectOne()方法。
 ```java
 @Override
@@ -59,7 +60,9 @@ public <E> List<E> selectList(String statement, Object parameter, RowBounds rowB
 * 2.使用执行器executor执行sql查询内容
 * 3.将异常上下文ErrorContext重置
 
-方法调用流程图如下：</br>
+## 步骤1
+
+### 方法调用流程图如下：</br>
 selectList()  # 查询，返回list </br>
 　　->configuration.getMappedStatement(statement) # 获取MappedStatement节点</br>
 　　　　->buildAllStatements() #创建所有的属性</br>
@@ -72,6 +75,7 @@ selectList()  # 查询，返回list </br>
 　　->executor.query() # 执行查询</br>
 　　->ErrorContext.instance().reset() #异常上下文重置</br>
 
+### 方法(1)
 我们先讲解方法(1)ResultMapResolver的resolve()方法
 ```java
 /**
@@ -207,3 +211,41 @@ public void addResultMap(ResultMap rm) {
 * * * 2.2.1.将resultMap放入configuration的resultMaps中
 * * * 2.2.2.从自身出发，判断该resultMap的discriminator是否嵌套ResultMap。
 * * * 2.2.3.从全局出发，判断系统中的resultMap的discriminator中是否包含自己。
+
+### 方法(2)
+下面看一下方法(2) CacheRefResolver的resolveCacheRef()
+
+这个方法比较简单，思路就是从configuration中获取
+```java
+public Cache resolveCacheRef() {
+  return assistant.useCacheRef(cacheRefNamespace);
+}
+
+public Cache useCacheRef(String namespace) {
+	if (namespace == null) {
+		throw new BuilderException(
+				"cache-ref element requires a namespace attribute.");
+	}
+	try {
+		// 未解决的缓存引用标志置为true
+		unresolvedCacheRef = true;
+		// 从configuration中根据namespace获取缓存
+		Cache cache = configuration.getCache(namespace);
+		if (cache == null) {
+			throw new IncompleteElementException("No cache for namespace '"
+					+ namespace + "' could be found.");
+		}
+		// 如果缓存引用不为空，赋给当前缓存
+		currentCache = cache;
+		// 未解决缓存引用标志置为false
+		unresolvedCacheRef = false;
+		return cache;
+	} catch (IllegalArgumentException e) {
+		throw new IncompleteElementException("No cache for namespace '"
+				+ namespace + "' could be found.", e);
+	}
+}
+```
+### 方法(3)
+解析了< select>中的所有属性  内容较多，难点在对< include>,< selectKey>两个节点的解析。
+### 方法(4)
