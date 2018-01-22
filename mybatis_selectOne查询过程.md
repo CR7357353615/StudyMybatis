@@ -34,7 +34,7 @@ public <T> T selectOne(String statement, Object parameter) {
 // } else {
  // return null;
 // }
-	}
+}
 ```
 这里调用selectList方法，可以看出查询最终都调用的是selectList方法，只是selectOne方法在外层加了一层判断。下面是selectList方法的源码：
 ```java
