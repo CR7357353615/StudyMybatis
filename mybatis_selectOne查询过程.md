@@ -137,20 +137,25 @@ public ResultMap resolve() {
 public ResultMap addResultMap(String id, Class<?> type, String extend, Discriminator discriminator, List<ResultMapping> resultMappings, Boolean autoMapping) {
   // 获取当前命名空间
   // id = applyCurrentNamespace(id, false);
+
   // 获取继承的namespace
   // extend = applyCurrentNamespace(extend, true);
+
   // 如果resultMap有继承的resultMap
   if (extend != null) {
     // 如果继承的resultMap不存在，抛异常
     // if (!configuration.hasResultMap(extend)) {
       // throw new IncompleteElementException("Could not find a parent resultmap with id '" + extend + "'");
     // }
+
     // 获取父resultMap
     // ResultMap resultMap = configuration.getResultMap(extend);
+
     // 获取父resultMap的映射信息ResultMapping
     List<ResultMapping> extendedResultMappings = new ArrayList<ResultMapping>(resultMap.getResultMappings());
     // 将父resultMap中与子resultMap相同的resultMapping删除掉（为了实现子resultMap覆盖父resultMap）
     extendedResultMappings.removeAll(resultMappings);
+
     // Remove parent constructor if this resultMap declares a constructor.
     // 如果这个子resultMap中包含constructor，删除父resultMap的constructor
     boolean declaresConstructor = false;
@@ -168,9 +173,11 @@ public ResultMap addResultMap(String id, Class<?> type, String extend, Discrimin
         }
       }
     }
+
     // 将父resultMap的resultMapping加入到子resultMap中
     resultMappings.addAll(extendedResultMappings);
   }
+
   // 如果没有父resultMap，
   ResultMap resultMap = new ResultMap.Builder(configuration, id, type, resultMappings, autoMapping)
       .discriminator(discriminator)
