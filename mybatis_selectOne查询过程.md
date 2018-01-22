@@ -62,5 +62,141 @@ public <E> List<E> selectList(String statement, Object parameter, RowBounds rowB
 方法调用流程图如下：</br>
 selectList()  # 查询，返回list </br>
 　　->configuration.getMappedStatement(statement) # 获取MappedStatement节点</br>
+　　　　->buildAllStatements() #创建所有的属性</br>
+　　　　　　(1)->ResultMapResolver resolve() # 添加ResultMap </br>
+　　　　　　　　　(5)->MapperBuilderAssistant addResultMap()  #添加 resultMap</br>
+　　　　　　　　　　　(6)->Configuration addResultMap() # 将resultMap加入configuration中</br>
+　　　　　　(2)->CacheRefResolver resolveCacheRef() # 使用引用缓存 </br>
+　　　　　　(3)->XMLStatementBuilder parseStatementNode() # 解析节点</br>
+　　　　　　(4)->MethodResolver resolve() </br>
 　　->executor.query() # 执行查询</br>
-　　->ErrorContext.instance().reset() #异常上下文重置
+　　->ErrorContext.instance().reset() #异常上下文重置</br>
+
+我们先讲解方法(1)ResultMapResolver的resolve()方法
+```java
+/**
+  * @param id resultMap的id
+  * @param type resultMap的类型
+  * @param extend 父resultMap
+  * @param discriminator resultMap的鉴别器
+  * @param resultMappings 映射节点
+  * @param autoMapping 是否自动映射
+  * @return
+*/
+public ResultMap resolve() {
+  return assistant.addResultMap(this.id, this.type, this.extend, this.discriminator, this.resultMappings, this.autoMapping);
+}
+```
+这里的属性要关注一下extend和discriminator。
+
+* extend是resultMap继承的父resultMap。
+* discriminator是resultMap的鉴别器。
+
+鉴别器介绍起来比较抽象，看了下面这段代码就能很好的理解：
+```xml
+<select id="getEmployee" parameterType="int" resultMap="employeeMap">  
+    select id, emp_name as empName, sex from t_employee where id =#{id}  
+</select>  
+
+<!-- <resultMap id="employeeMap" type="com.ykzhen2015.csdn.pojo.Employee">  
+  <id property="id" column="id" />  
+  <result property="empName" column="emp_name" />  
+  <result property="sex" column="sex" />  
+  <association property="employeeCard" column="id"  
+      select="com.ykzhen2015.csdn.mapper.EmployeeCardMapper.getEmployeeCardByEmpId" />  
+  <collection property="projectList" column="id"  
+      select="com.ykzhen2015.csdn.mapper.ProjectMapper.findProjectByEmpId" /> -->
+  <discriminator javaType="int" column="sex">  
+      <case value="1" resultMap="maleEmployeeMap" />  
+      <case value="2" resultMap="femaleEmployeeMap" />  
+  </discriminator>  
+<!-- </resultMap> -->  
+
+<resultMap id="maleEmployeeMap" type="com.ykzhen2015.csdn.pojo.MaleEmployee" extends="employeeMap">  
+    <collection property="prostateList" select="com.ykzhen2015.csdn.mapper.MaleEmployeeMapper.findProstateList" column="id" />  
+</resultMap>  
+
+<resultMap id="femaleEmployeeMap" type="com.ykzhen2015.csdn.pojo.FemaleEmployee" extends="employeeMap">  
+    <collection property="uterusList" select="com.ykzhen2015.csdn.mapper.FemaleEmployeeMapper.findUterusList" column="id" />  
+</resultMap>
+```
+其实discriminator就是在resultMap中根据某属性的值动态选择另一个resultMap。
+
+下面讲解一下方法(5) addResultMap():
+```java
+/**
+ * 添加ResultMap
+ * @param id namespace
+ * @param type 类型
+ * @param extend 继承自
+ * @param discriminator 鉴别器
+ * @param resultMappings 结果映射集
+ * @param autoMapping 自动映射
+ * @return
+ */
+public ResultMap addResultMap(String id, Class<?> type, String extend, Discriminator discriminator, List<ResultMapping> resultMappings, Boolean autoMapping) {
+  // 获取当前命名空间
+  // id = applyCurrentNamespace(id, false);
+  // 获取继承的namespace
+  // extend = applyCurrentNamespace(extend, true);
+  // 如果resultMap有继承的resultMap
+  if (extend != null) {
+    // 如果继承的resultMap不存在，抛异常
+    // if (!configuration.hasResultMap(extend)) {
+      // throw new IncompleteElementException("Could not find a parent resultmap with id '" + extend + "'");
+    // }
+    // 获取父resultMap
+    // ResultMap resultMap = configuration.getResultMap(extend);
+    // 获取父resultMap的映射信息ResultMapping
+    List<ResultMapping> extendedResultMappings = new ArrayList<ResultMapping>(resultMap.getResultMappings());
+    // 将父resultMap中与子resultMap相同的resultMapping删除掉（为了实现子resultMap覆盖父resultMap）
+    extendedResultMappings.removeAll(resultMappings);
+    // Remove parent constructor if this resultMap declares a constructor.
+    // 如果这个子resultMap中包含constructor，删除父resultMap的constructor
+    boolean declaresConstructor = false;
+    for (ResultMapping resultMapping : resultMappings) {
+      if (resultMapping.getFlags().contains(ResultFlag.CONSTRUCTOR)) {
+        declaresConstructor = true;
+        break;
+      }
+    }
+    if (declaresConstructor) {
+      Iterator<ResultMapping> extendedResultMappingsIter = extendedResultMappings.iterator();
+      while (extendedResultMappingsIter.hasNext()) {
+        if (extendedResultMappingsIter.next().getFlags().contains(ResultFlag.CONSTRUCTOR)) {
+          extendedResultMappingsIter.remove();
+        }
+      }
+    }
+    // 将父resultMap的resultMapping加入到子resultMap中
+    resultMappings.addAll(extendedResultMappings);
+  }
+  // 如果没有父resultMap，
+  ResultMap resultMap = new ResultMap.Builder(configuration, id, type, resultMappings, autoMapping)
+      .discriminator(discriminator)
+      .build();
+  configuration.addResultMap(resultMap);
+  return resultMap;
+}
+```
+下面是方法(6)
+```java
+public void addResultMap(ResultMap rm) {
+  resultMaps.put(rm.getId(), rm);
+  // 从自身出发，判断该resultMap的discriminator是否嵌套ResultMap。
+  checkLocallyForDiscriminatedNestedResultMaps(rm);
+  // 从全局出发，判断系统中的resultMap的discriminator中是否包含自己。
+  checkGloballyForDiscriminatedNestedResultMaps(rm);
+}
+```
+这段代码主要做了以下几件事：
+* 1.如果resultMap有父resultMap
+* * 1.1.将父resultMap和本resultMap中相同的resultMappings删掉（为了用子resultMap中的resultMappings覆盖父resultMap）
+* * 1.2.如果这个子resultMap中包含constructor，删除父resultMap的constructor
+* * 1.3.将父resultMap的resultMapping加入到子resultMap中
+* 2.如果resultMap没有父resultMap
+* * 2.1.创建resultMap
+* * 2.2.configuration加入resultMap
+* * * 2.2.1.将resultMap放入configuration的resultMaps中
+* * * 2.2.2.从自身出发，判断该resultMap的discriminator是否嵌套ResultMap。
+* * * 2.2.3.从全局出发，判断系统中的resultMap的discriminator中是否包含自己。
