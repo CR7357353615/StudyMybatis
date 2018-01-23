@@ -249,3 +249,246 @@ public Cache useCacheRef(String namespace) {
 ### 方法(3)
 解析了< select>中的所有属性  内容较多，难点在对< include>,< selectKey>两个节点的解析。
 ### 方法(4)
+在了解方法(4)前，需要了解一下注解方式动态执行sql语句，下面是一个例子。
+```java
+public interface EmployeeMapper {
+  // 动态查询
+  @SelectProvider(type=EmployeeDynaSqlProvider.class,method="selectWhitParam")
+  List<Employee> selectWhitParam(Map<String, Object> param);
+}
+
+public class EmployeeDynaSqlProvider {
+  public String selectWhitParam(Map<String, Object> param){
+    return new SQL(){
+        {
+            SELECT("*");
+            FROM("tb_employee");
+            if(param.get("id") != null){
+                WHERE(" id = #{id} ");
+            }
+            if(param.get("loginname") != null){
+                WHERE(" loginname = #{loginname} ");
+            }
+            if(param.get("password") != null){
+                WHERE("password = #{password}");
+            }
+            if(param.get("name")!= null){
+                WHERE("name = #{name}");
+            }
+            if(param.get("sex")!= null){
+                WHERE("sex = #{sex}");
+            }
+            if(param.get("age")!= null){
+                WHERE("age = #{age}");
+            }
+            if(param.get("phone")!= null){
+                WHERE("phone = #{phone}");
+            }
+            if(param.get("sal")!= null){
+                WHERE("sal = #{sal}");
+            }
+            if(param.get("state")!= null){
+                WHERE("state = #{state}");
+            }
+        }
+    }.toString();
+  }    
+}
+```
+上面这个例子就是在注解中指定实现类和method，根据传入的值动态执行。下面看一下源代码：
+```java
+public void resolve() {
+  annotationBuilder.parseStatement(method);
+}
+```
+```java
+/**
+ * 解析statement
+ * @param method
+ */
+void parseStatement(Method method) {
+	// 获取方法参数的类型
+	Class<?> parameterTypeClass = getParameterType(method);
+	// 获取language驱动
+	LanguageDriver languageDriver = getLanguageDriver(method);
+	// 从注解中获取sqlSource
+	SqlSource sqlSource = getSqlSourceFromAnnotations(method, parameterTypeClass, languageDriver);
+	// 如果sqlSoruce不为空
+	if (sqlSource != null) {
+		// 获取方法中的设置注解
+		Options options = method.getAnnotation(Options.class);
+		// mappedStatementId为接口名.方法名
+		final String mappedStatementId = type.getName() + "." + method.getName();
+		Integer fetchSize = null;
+		Integer timeout = null;
+		// statementType默认为Prepared
+		StatementType statementType = StatementType.PREPARED;
+		// resultSetType默认为foreard_only
+		ResultSetType resultSetType = ResultSetType.FORWARD_ONLY;
+		// 获取执行类型
+		SqlCommandType sqlCommandType = getSqlCommandType(method);
+		// 是否是select
+		boolean isSelect = sqlCommandType == SqlCommandType.SELECT;
+		// 如果是select，不刷新缓存，否则刷新缓存
+		boolean flushCache = !isSelect;
+		// 如果是select，使用二级缓存，否则不使用
+		boolean useCache = isSelect;
+
+		KeyGenerator keyGenerator;
+		String keyProperty = "id";
+		String keyColumn = null;
+		// 如果是Insert或是Update
+		if (SqlCommandType.INSERT.equals(sqlCommandType) || SqlCommandType.UPDATE.equals(sqlCommandType)) {
+			// first check for SelectKey annotation - that overrides
+			// everything else
+			// 获取SelectKey注解
+			SelectKey selectKey = method.getAnnotation(SelectKey.class);
+			// 如果不为空
+			if (selectKey != null) {
+				// 处理selectKey
+				keyGenerator = handleSelectKeyAnnotation(selectKey, mappedStatementId, getParameterType(method), languageDriver);
+				// 获取selectKey的keyProperty
+				keyProperty = selectKey.keyProperty();
+		    // 如果设置项为空
+			} else if (options == null) {
+				// 主键生成器
+				keyGenerator = configuration.isUseGeneratedKeys() ? Jdbc3KeyGenerator.INSTANCE : NoKeyGenerator.INSTANCE;
+			} else {
+				// 如果options不为空，则取options中的useGeneratedKeys进行判断
+				keyGenerator = options.useGeneratedKeys() ? Jdbc3KeyGenerator.INSTANCE : NoKeyGenerator.INSTANCE;
+				keyProperty = options.keyProperty();
+				keyColumn = options.keyColumn();
+			}
+		} else {
+			keyGenerator = NoKeyGenerator.INSTANCE;
+		}
+
+		// 如果options不为空
+		if (options != null) {
+			// 判断options中是否要刷新缓存
+			if (FlushCachePolicy.TRUE.equals(options.flushCache())) {
+				flushCache = true;
+			} else if (FlushCachePolicy.FALSE.equals(options.flushCache())) {
+				flushCache = false;
+			}
+			useCache = options.useCache();
+			fetchSize = options.fetchSize() > -1 || options.fetchSize() == Integer.MIN_VALUE ? options.fetchSize() : null; // issue #348
+			timeout = options.timeout() > -1 ? options.timeout() : null;
+			statementType = options.statementType();
+			resultSetType = options.resultSetType();
+		}
+
+		String resultMapId = null;
+		// 获取方法的ResultMap注解
+		ResultMap resultMapAnnotation = method.getAnnotation(ResultMap.class);
+		// 如果注解不为空
+		if (resultMapAnnotation != null) {
+			String[] resultMaps = resultMapAnnotation.value();
+			StringBuilder sb = new StringBuilder();
+			for (String resultMap : resultMaps) {
+				if (sb.length() > 0) {
+					sb.append(",");
+				}
+				sb.append(resultMap);
+			}
+			resultMapId = sb.toString();
+		}
+		// 如果注解为空，并且是select
+		else if (isSelect) {
+			// 解析ResultMap
+			resultMapId = parseResultMap(method);
+		}
+
+		assistant.addMappedStatement(mappedStatementId, sqlSource,
+				statementType, sqlCommandType, fetchSize, timeout,
+				// ParameterMapID
+				null, parameterTypeClass, resultMapId,
+				getReturnType(method), resultSetType, flushCache, useCache,
+				// TODO gcode issue #577
+				false, keyGenerator, keyProperty, keyColumn,
+				// DatabaseID
+				null, languageDriver,
+				// ResultSets
+				options != null ? nullOrEmpty(options.resultSets()) : null);
+	}
+}
+```
+
+步骤1是解析节点的步骤，内容比较多，因为有xml的方式还有Annotation的方式，主要来讲就是解析xml或Annotation中的各种配置项。
+## 步骤2
+再回到selectList方法，继续SelectOne的第二个步骤，执行器的查询过程
+```java
+@Override
+public <E> List<E> selectList(String statement, Object parameter, RowBounds rowBounds) {
+	try {
+		// 解析得到这个节点
+		// MappedStatement ms = configuration.getMappedStatement(statement);
+		// 执行器执行query操作
+		return executor.query(ms, wrapCollection(parameter), rowBounds, Executor.NO_RESULT_HANDLER);
+	// } catch (Exception e) {
+		// throw ExceptionFactory.wrapException(
+				// "Error querying database.  Cause: " + e, e);
+	// } finally {
+		// 异常上下文重置
+		// ErrorContext.instance().reset();
+	}
+}
+```
+wrapCollection()方法作用是：
+* 1.如果object是一个容器类，向map中放入collection-object，并且如果object是一个list，向map中放入list-object
+* 2.如果object是一个数组类型，向map中放入array-object
+
+下面是BaseExecutor的query方法：
+```java
+@Override
+public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler) throws SQLException {
+  BoundSql boundSql = ms.getBoundSql(parameter);
+  CacheKey key = createCacheKey(ms, parameter, rowBounds, boundSql);
+  return query(ms, parameter, rowBounds, resultHandler, key, boundSql);
+}
+```
+* 1.第一步获取boundSql
+* 2.生成一级缓存key
+* 3.查询
+
+主要看一下query方法
+```java
+@SuppressWarnings("unchecked")
+@Override
+public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler, CacheKey key, BoundSql boundSql) throws SQLException {
+  ErrorContext.instance().resource(ms.getResource()).activity("executing a query").object(ms.getId());
+  if (closed) {
+    throw new ExecutorException("Executor was closed.");
+  }
+  if (queryStack == 0 && ms.isFlushCacheRequired()) {
+    clearLocalCache();
+  }
+  List<E> list;
+  try {
+    queryStack++;
+//      localCache是一级缓存
+    list = resultHandler == null ? (List<E>) localCache.getObject(key) : null;
+    //如果拿到一级缓存
+    if (list != null) {
+      handleLocallyCachedOutputParameters(ms, key, parameter, boundSql);
+    } else {	//没有拿到缓存，查询数据库
+      list = queryFromDatabase(ms, parameter, rowBounds, resultHandler, key, boundSql);
+    }
+  } finally {
+    queryStack--;
+  }
+  if (queryStack == 0) {
+    for (DeferredLoad deferredLoad : deferredLoads) {
+      deferredLoad.load();
+    }
+    // issue #601
+    deferredLoads.clear();
+    if (configuration.getLocalCacheScope() == LocalCacheScope.STATEMENT) {
+      // issue #482
+      clearLocalCache();
+    }
+  }
+  return list;
+}
+```
+最终返回的List就是结果List
