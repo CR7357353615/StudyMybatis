@@ -439,6 +439,9 @@ wrapCollection()方法作用是：
 * 2.如果object是一个数组类型，向map中放入array-object
 
 下面是BaseExecutor的query方法：
+* 1.第一步获取boundSql
+* 2.生成一级缓存key
+* 3.查询
 ```java
 @Override
 public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBounds, ResultHandler resultHandler) throws SQLException {
@@ -447,9 +450,52 @@ public <E> List<E> query(MappedStatement ms, Object parameter, RowBounds rowBoun
   return query(ms, parameter, rowBounds, resultHandler, key, boundSql);
 }
 ```
-* 1.第一步获取boundSql
-* 2.生成一级缓存key
-* 3.查询
+看一下MappedStatement的getBoundSql方法
+```java
+public BoundSql getBoundSql(Object parameterObject) {
+    BoundSql boundSql = sqlSource.getBoundSql(parameterObject);
+    // List<ParameterMapping> parameterMappings = boundSql.getParameterMappings();
+    // if (parameterMappings == null || parameterMappings.isEmpty()) {
+    //   boundSql = new BoundSql(configuration, boundSql.getSql(), parameterMap.getParameterMappings(), parameterObject);
+    // }
+    //
+    // // check for nested result maps in parameter mappings (issue #30)
+    // for (ParameterMapping pm : boundSql.getParameterMappings()) {
+    //   String rmId = pm.getResultMapId();
+    //   if (rmId != null) {
+    //     ResultMap rm = configuration.getResultMap(rmId);
+    //     if (rm != null) {
+    //       // 按位或赋值给hasNestedResultMaps
+    //       hasNestedResultMaps |= rm.hasNestedResultMaps();
+    //     }
+    //   }
+    // }
+    //
+    // return boundSql;
+  }
+```
+接着看DynamicSqlSource的getBoundSql方法。
+![](imgs/selectOne.png)
+rootSqlNode.apply(context);调用了DynamicContext的context.appendSql(text);方法。
+```java
+@Override
+ public BoundSql getBoundSql(Object parameterObject) {
+   DynamicContext context = new DynamicContext(configuration, parameterObject);
+   // 将动态的sql块拼接到DynamicContext中，并且解析${ }
+   rootSqlNode.apply(context);
+   SqlSourceBuilder sqlSourceParser = new SqlSourceBuilder(configuration);
+   Class<?> parameterType = parameterObject == null ? Object.class : parameterObject.getClass();
+   // 解析#{ }
+   SqlSource sqlSource = sqlSourceParser.parse(context.getSql(), parameterType, context.getBindings());
+   // 这个BoundSql就是数据库可执行的Sql,同时还包含了运行时的参数。
+   BoundSql boundSql = sqlSource.getBoundSql(parameterObject);
+   for (Map.Entry<String, Object> entry : context.getBindings().entrySet()) {
+     boundSql.setAdditionalParameter(entry.getKey(), entry.getValue());
+   }
+   return boundSql;
+ }
+```
+
 
 主要看一下query方法
 ```java
